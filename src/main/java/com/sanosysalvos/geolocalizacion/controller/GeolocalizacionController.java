@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sanosysalvos.geolocalizacion.dto.UbicacionRequestDTO;
 import com.sanosysalvos.geolocalizacion.model.ReporteGeografico;
 import com.sanosysalvos.geolocalizacion.service.GeolocalizacionService;
 
@@ -24,8 +25,12 @@ public class GeolocalizacionController {
     private final GeolocalizacionService service;
 
     @PostMapping
-    public ResponseEntity<ReporteGeografico> registrarUbicacion(@Valid @RequestBody ReporteGeografico reporte) {
-        ReporteGeografico nuevoReporte = service.registrarUbicacion(reporte);
+    public ResponseEntity<ReporteGeografico> registrarUbicacion(@Valid @RequestBody UbicacionRequestDTO request) {
+        //El Controller extrae los datos del DTO y llama al nuevo método del Service
+        ReporteGeografico nuevoReporte = service.registrarUbicacion(
+                request.getMascotaId(), 
+                request.getDireccion()
+        );
         return new ResponseEntity<>(nuevoReporte, HttpStatus.CREATED); 
     }
 
