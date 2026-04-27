@@ -1,1 +1,1 @@
-# sanos-y-salvos-geolocaliazcion
+# sanos-y-salvos-geolocalizacion
