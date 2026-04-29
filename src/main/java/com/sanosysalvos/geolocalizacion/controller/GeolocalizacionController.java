@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sanosysalvos.geolocalizacion.dto.ReporteGeograficoResponseDTO;
 import com.sanosysalvos.geolocalizacion.dto.UbicacionRequestDTO;
-import com.sanosysalvos.geolocalizacion.model.ReporteGeografico;
 import com.sanosysalvos.geolocalizacion.service.GeolocalizacionService;
 
 import jakarta.validation.Valid;
@@ -29,31 +29,22 @@ public class GeolocalizacionController {
     private final GeolocalizacionService service;
 
     @PostMapping
-    public ResponseEntity<ReporteGeografico> registrarUbicacion(@Valid @RequestBody UbicacionRequestDTO request) {
-        //El Controller extrae los datos del DTO y llama al nuevo método del Service
-        ReporteGeografico nuevoReporte = service.registrarUbicacion(
-                request.getMascotaId(), 
-                request.getDireccion()
-        );
-        return new ResponseEntity<>(nuevoReporte, HttpStatus.CREATED); 
+    public ResponseEntity<ReporteGeograficoResponseDTO> registrarUbicacion(@Valid @RequestBody UbicacionRequestDTO request) {
+        return new ResponseEntity<>(service.registrarUbicacion(request.getMascotaId(), request.getDireccion()), HttpStatus.CREATED);
     }
 
     @GetMapping
-    public ResponseEntity<List<ReporteGeografico>> listarUbicaciones() {
+    public ResponseEntity<List<ReporteGeograficoResponseDTO>> listarUbicaciones() {
         return ResponseEntity.ok(service.obtenerTodos());
     }
 
-    // ... después de listarUbicaciones()
-
     @GetMapping("/{id}")
-    public ResponseEntity<ReporteGeografico> obtenerPorId(@PathVariable Integer id) {
+    public ResponseEntity<ReporteGeograficoResponseDTO> obtenerPorId(@PathVariable Integer id) {
         return ResponseEntity.ok(service.obtenerPorId(id));
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<ReporteGeografico> actualizarReporteParcial(
-            @PathVariable Integer id, 
-            @RequestBody Map<String, Object> campos) {
+    public ResponseEntity<ReporteGeograficoResponseDTO> actualizarReporteParcial(@PathVariable Integer id, @RequestBody Map<String, Object> campos) {
         return ResponseEntity.ok(service.actualizarParcial(id, campos));
     }
 
