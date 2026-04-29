@@ -2,6 +2,7 @@ package com.sanosysalvos.geolocalizacion.service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -13,6 +14,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.sanosysalvos.geolocalizacion.dto.LocationIqResponse;
+import com.sanosysalvos.geolocalizacion.dto.ReporteGeograficoResponseDTO;
 import com.sanosysalvos.geolocalizacion.model.ReporteGeografico;
 import com.sanosysalvos.geolocalizacion.repository.ReporteGeograficoRepository;
 
@@ -32,8 +34,7 @@ public class GeolocalizacionService {
     @Value("${locationiq.api.url}")
     private String apiUrl;
 
-    public ReporteGeografico registrarUbicacion(Integer mascotaId, String direccionStr) {
-        // 1. Llamar a LocationIQ
+    public ReporteGeograficoResponseDTO registrarUbicacion(Integer mascotaId, String direccionStr) {
         String url = apiUrl + "?key=" + apiKey + "&q=" + direccionStr + "&format=json";
         LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class);
 
@@ -41,36 +42,37 @@ public class GeolocalizacionService {
             double lat = Double.parseDouble(response[0].getLat());
             double lon = Double.parseDouble(response[0].getLon());
 
-            // 2. Crear el objeto Point de PostGIS
             Point ubicacionPoint = geometryFactory.createPoint(new Coordinate(lon, lat));
             ubicacionPoint.setSRID(4326); 
 
-            // 3. Guardar en Base de Datos
             ReporteGeografico reporte = new ReporteGeografico();
             reporte.setMascotaId(mascotaId);
             reporte.setUbicacion(ubicacionPoint);
             reporte.setRadioKm(5.0); 
             
-            return repository.save(reporte);
+            return toDTO(repository.save(reporte));
         } else {
-            throw new RuntimeException("No se pudo encontrar la direcciÃ³n usando LocationIQ");
+            throw new RuntimeException("No se pudo encontrar la dirección usando LocationIQ");
         }
     }
 
-    public List<ReporteGeografico> obtenerTodos() {
-        return repository.findAll();
+    public List<ReporteGeograficoResponseDTO> obtenerTodos() {
+        return repository.findAll().stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
     }
 
-    // ... después de obtenerTodos()
-
-    public ReporteGeografico obtenerPorId(Integer id) {
-        return repository.findById(id)
+    public ReporteGeograficoResponseDTO obtenerPorId(Integer id) {
+        ReporteGeografico reporte = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "El reporte geográfico con ID " + id + " no existe"));
+        return toDTO(reporte);
     }
 
-    public ReporteGeografico actualizarParcial(Integer id, Map<String, Object> campos) {
-        ReporteGeografico reporte = obtenerPorId(id);
+    public ReporteGeograficoResponseDTO actualizarParcial(Integer id, Map<String, Object> campos) {
+        ReporteGeografico reporte = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "No existe el reporte con ID " + id));
 
         if (campos.containsKey("radioKm")) {
             Object radioObj = campos.get("radioKm");
@@ -95,15 +97,28 @@ public class GeolocalizacionService {
                 nuevaUbicacion.setSRID(4326); 
                 reporte.setUbicacion(nuevaUbicacion);
             } else {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo geolocalizar la nueva dirección");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo geolocalizar la dirección");
             }
         }
 
-        return repository.save(reporte);
+        return toDTO(repository.save(reporte));
     }
 
     public void eliminarReporte(Integer id) {
-        ReporteGeografico reporte = obtenerPorId(id);
+        ReporteGeografico reporte = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ID no encontrado"));
         repository.delete(reporte);
+    }
+
+    // Método helper para convertir Entidad a DTO
+    private ReporteGeograficoResponseDTO toDTO(ReporteGeografico reporte) {
+        return ReporteGeograficoResponseDTO.builder()
+                .id(reporte.getId())
+                .mascotaId(reporte.getMascotaId())
+                .latitud(reporte.getUbicacion().getY()) // Y = Latitud
+                .longitud(reporte.getUbicacion().getX()) // X = Longitud
+                .radioKm(reporte.getRadioKm())
+                .esActivo(reporte.getEsActivo())
+                .build();
     }
 }
