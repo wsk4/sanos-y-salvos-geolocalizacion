@@ -1,17 +1,19 @@
-# 1. Imagen Base: Utilizamos un entorno ligero (alpine) que ya tiene Java 21 instalado.
-FROM eclipse-temurin:21-jdk-alpine
-
-# 2. Información del mantenedor (opcional, buena práctica)
-LABEL maintainer="Equipo Sanos y Salvos"
-
-# 3. Directorio de trabajo: Creamos una carpeta /app dentro del contenedor
+# Etapa 1: Construcción (Build)
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+# Compila el proyecto saltando los tests para agilizar el proceso
+RUN mvn clean package -DskipTests
 
-# 4. Copiar el ejecutable: Tomamos el archivo .jar generado por Maven y lo metemos al contenedor con el nombre 'app.jar'
-COPY target/gestormascotas-0.0.1-SNAPSHOT.jar app.jar
+# Etapa 2: Ejecución (Run)
+FROM eclipse-temurin:21-jdk-alpine
+WORKDIR /app
+# Copia el .jar generado en la etapa anterior
+COPY --from=build /app/target/*.jar app.jar
 
-# 5. Puertos: Le indicamos a Docker que este contenedor recibirá tráfico por el puerto 8080
+# Expone el puerto (cada contenedor sobrescribirá esto según su config)
 EXPOSE 8081
 
-# 6. Comando de inicio: Lo que ejecutará el contenedor al encenderse
+# Comando para ejecutar la aplicación
 ENTRYPOINT ["java", "-jar", "app.jar"]
