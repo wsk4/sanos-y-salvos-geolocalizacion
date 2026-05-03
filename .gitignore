@@ -1,23 +1,51 @@
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+# === SEGURIDAD (CRÍTICO) ===
+# Nunca subir credenciales al control de versiones
+.env
+.env.local
+.env.dev
+.env.prod
+*.env
 
-### STS ###
+# === MAVEN / JAVA ===
+target/
+!.mvn/wrapper/maven-wrapper.jar
+/release/
+*.class
+*.war
+*.ear
+*.tar.gz
+
+# === LOGS ===
+*.log
+logs/
+/temp/
+
+# === SISTEMA OPERATIVO ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === IDEs (Limpieza total) ===
+# IntelliJ
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# VS Code
+.vscode/
+.history/
+*.code-workspace
+
+# STS / Eclipse
 .apt_generated
 .classpath
 .factorypath
 .project
-.settings
+.settings/
 .springBeans
 .sts4-cache
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
 
 ### NetBeans ###
 /nbproject/private/
@@ -26,8 +54,3 @@ target/
 /nbdist/
 /.nb-gradle/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
-.vscode/
