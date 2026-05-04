@@ -18,6 +18,7 @@ import com.sanosysalvos.geolocalizacion.dto.ReporteGeograficoResponseDTO;
 import com.sanosysalvos.geolocalizacion.model.ReporteGeografico;
 import com.sanosysalvos.geolocalizacion.repository.ReporteGeograficoRepository;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -34,6 +35,7 @@ public class GeolocalizacionService {
     @Value("${locationiq.api.url}")
     private String apiUrl;
 
+    @CircuitBreaker(name = "locationIqCB", fallbackMethod = "fallbackRegistrarUbicacion")
     public ReporteGeograficoResponseDTO registrarUbicacion(Integer mascotaId, String direccionStr) {
         String url = apiUrl + "?key=" + apiKey + "&q=" + direccionStr + "&format=json";
         LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class);
@@ -52,8 +54,14 @@ public class GeolocalizacionService {
             
             return toDTO(repository.save(reporte));
         } else {
-            throw new RuntimeException("No se pudo encontrar la dirección usando LocationIQ");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No se pudo encontrar la dirección en LocationIQ");
         }
+    }
+
+    public ReporteGeograficoResponseDTO fallbackRegistrarUbicacion(Integer mascotaId, String direccionStr, Throwable t) {
+        throw new ResponseStatusException(
+            HttpStatus.SERVICE_UNAVAILABLE, 
+            "Servicio externo de mapas no disponible temporalmente. (Circuit Breaker Activo)");
     }
 
     public List<ReporteGeograficoResponseDTO> obtenerTodos() {
@@ -63,12 +71,13 @@ public class GeolocalizacionService {
     }
 
     public ReporteGeograficoResponseDTO obtenerPorId(Integer id) {
-        ReporteGeografico reporte = repository.findById(id)
+        return repository.findById(id)
+                .map(this::toDTO)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "El reporte geográfico con ID " + id + " no existe"));
-        return toDTO(reporte);
     }
 
+    @CircuitBreaker(name = "locationIqCB", fallbackMethod = "fallbackActualizarParcial")
     public ReporteGeograficoResponseDTO actualizarParcial(Integer id, Map<String, Object> campos) {
         ReporteGeografico reporte = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -97,11 +106,17 @@ public class GeolocalizacionService {
                 nuevaUbicacion.setSRID(4326); 
                 reporte.setUbicacion(nuevaUbicacion);
             } else {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo geolocalizar la dirección");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo geolocalizar la nueva dirección");
             }
         }
 
         return toDTO(repository.save(reporte));
+    }
+
+    public ReporteGeograficoResponseDTO fallbackActualizarParcial(Integer id, Map<String, Object> campos, Throwable t) {
+        throw new ResponseStatusException(
+            HttpStatus.SERVICE_UNAVAILABLE, 
+            "No se puede actualizar la dirección porque el servicio externo falló. Intente más tarde.");
     }
 
     public void eliminarReporte(Integer id) {
@@ -109,14 +124,13 @@ public class GeolocalizacionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ID no encontrado"));
         repository.delete(reporte);
     }
-
-    // Método helper para convertir Entidad a DTO
+    
     private ReporteGeograficoResponseDTO toDTO(ReporteGeografico reporte) {
         return ReporteGeograficoResponseDTO.builder()
                 .id(reporte.getId())
                 .mascotaId(reporte.getMascotaId())
-                .latitud(reporte.getUbicacion().getY()) // Y = Latitud
-                .longitud(reporte.getUbicacion().getX()) // X = Longitud
+                .latitud(reporte.getUbicacion().getY())
+                .longitud(reporte.getUbicacion().getX())
                 .radioKm(reporte.getRadioKm())
                 .esActivo(reporte.getEsActivo())
                 .build();
