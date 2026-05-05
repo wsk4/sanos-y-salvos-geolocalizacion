@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # 1. Base de Datos para Geolocalización (PostGIS)
+  postgres-geolocalizacion:
+    image: postgis/postgis:15-3.3
+    container_name: postgres-geolocalizacion
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5433:5432" # Mapeamos al 5433 para no chocar con la otra DB si corren en la misma PC
+    networks:
+      - sanos-network
+    volumes:
+      - pg_data_geo:/var/lib/postgresql/data
+
+  # 2. Microservicio de Geolocalización
+  ms-geolocalizacion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sanos_ms_geolocalizacion
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    environment:
+      # Configuración de base de datos para Spring Boot
+      # Usamos 'postgres-geolocalizacion' porque es el nombre del servicio arriba
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-geolocalizacion:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SERVER_PORT: ${SERVER_PORT}
+      
+      # Configuración de API Externa (LocationIQ)
+      LOCATIONIQ_API_KEY: ${LOCATIONIQ_API_KEY}
+      LOCATIONIQ_API_URL: ${LOCATIONIQ_API_URL}
+    depends_on:
+      - postgres-geolocalizacion
+    networks:
+      - sanos-network
+
+# Red compartida externa
+networks:
+  sanos-network:
+    external: true
+
+# Volumen para que no se borren los mapas/puntos al apagar
+volumes:
+  pg_data_geo:
