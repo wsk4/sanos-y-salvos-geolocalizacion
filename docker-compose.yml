@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres-geolocalizacion:
+    image: postgis/postgis:15-3.3
+    container_name: postgres-geolocalizacion
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5433:5432" 
+    networks:
+      - sanos-network
+    volumes:
+      - pg_data_geo:/var/lib/postgresql/data
+  ms-geolocalizacion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sanos-ms-geolocalizacion
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-geolocalizacion:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SERVER_PORT: ${SERVER_PORT}
+      LOCATIONIQ_API_KEY: ${LOCATIONIQ_API_KEY}
+      LOCATIONIQ_API_URL: ${LOCATIONIQ_API_URL}
+    depends_on:
+      - postgres-geolocalizacion
+    networks:
+      - sanos-network
+networks:
+  sanos-network:
+    external: true
+volumes:
+  pg_data_geo:
