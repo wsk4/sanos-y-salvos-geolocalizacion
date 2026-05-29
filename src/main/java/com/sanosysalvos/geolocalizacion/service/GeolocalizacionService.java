@@ -43,7 +43,7 @@ public class GeolocalizacionService {
         Optional<ReporteGeografico> reporteExistente = repository.findByMascotaId(mascotaId);
         if (reporteExistente.isPresent()) {
             throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
+                HttpStatus.BAD_REQUEST,
                 "Error: La mascota con ID " + mascotaId + " ya cuenta con una ubicación geográfica registrada."
             );
         }
@@ -52,8 +52,8 @@ public class GeolocalizacionService {
         ReporteGeografico reporte = new ReporteGeografico();
         reporte.setMascotaId(mascotaId);
         reporte.setUbicacion(ubicacionPoint);
-        reporte.setRadioKm(5.0); 
-        
+        reporte.setRadioKm(5.0);
+
         return toDTO(repository.save(reporte));
     }
 
@@ -62,7 +62,7 @@ public class GeolocalizacionService {
             throw (ResponseStatusException) t;
         }
         throw new ResponseStatusException(
-            HttpStatus.SERVICE_UNAVAILABLE, 
+            HttpStatus.SERVICE_UNAVAILABLE,
             "Servicio externo de mapas no disponible temporalmente. (Circuit Breaker Activo)");
     }
 
@@ -88,8 +88,7 @@ public class GeolocalizacionService {
         if (campos.containsKey("radioKm")) {
             Object radioObj = campos.get("radioKm");
             if (radioObj instanceof Number) {
-                Double nuevoRadio = ((Number) radioObj).doubleValue();
-                reporte.setRadioKm(nuevoRadio);
+                reporte.setRadioKm(((Number) radioObj).doubleValue());
             } else {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El valor de radioKm debe ser un número");
             }
@@ -101,8 +100,7 @@ public class GeolocalizacionService {
 
         if (campos.containsKey("direccion")) {
             String nuevaDireccion = (String) campos.get("direccion");
-            Point nuevaUbicacion = geocodificarDireccion(nuevaDireccion);
-            reporte.setUbicacion(nuevaUbicacion);
+            reporte.setUbicacion(geocodificarDireccion(nuevaDireccion));
         }
 
         return toDTO(repository.save(reporte));
@@ -113,7 +111,7 @@ public class GeolocalizacionService {
             throw (ResponseStatusException) t;
         }
         throw new ResponseStatusException(
-            HttpStatus.SERVICE_UNAVAILABLE, 
+            HttpStatus.SERVICE_UNAVAILABLE,
             "No se puede actualizar la dirección porque el servicio externo falló. Intente más tarde.");
     }
 
@@ -122,18 +120,20 @@ public class GeolocalizacionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ID no encontrado"));
         repository.delete(reporte);
     }
-    
+
     private Point geocodificarDireccion(String direccionStr) {
         String urlTemplate = apiUrl + "?key={key}&q={q}&format=json";
-        LocationIqResponse[] response = restTemplate.getForObject(urlTemplate, LocationIqResponse[].class, apiKey, direccionStr);
+        LocationIqResponse[] response = restTemplate.getForObject(
+            urlTemplate, LocationIqResponse[].class, apiKey, direccionStr
+        );
 
         if (response != null && response.length > 0) {
             double lat = Double.parseDouble(response[0].getLat());
             double lon = Double.parseDouble(response[0].getLon());
 
-            Point ubicacionPoint = geometryFactory.createPoint(new Coordinate(lon, lat));
-            ubicacionPoint.setSRID(4326);
-            return ubicacionPoint;
+            Point point = geometryFactory.createPoint(new Coordinate(lon, lat));
+            point.setSRID(4326);
+            return point;
         } else {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No se pudo encontrar la dirección en LocationIQ");
         }
