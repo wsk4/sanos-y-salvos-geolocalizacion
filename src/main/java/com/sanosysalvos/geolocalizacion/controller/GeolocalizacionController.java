@@ -43,6 +43,12 @@ public class GeolocalizacionController {
         return ResponseEntity.ok(service.obtenerPorId(id));
     }
 
+    //busca la geo por ID de mascota (no por ID del reporte)
+    @GetMapping("/mascota/{mascotaId}")
+    public ResponseEntity<ReporteGeograficoResponseDTO> obtenerPorMascotaId(@PathVariable Integer mascotaId) {
+        return ResponseEntity.ok(service.obtenerPorMascotaId(mascotaId));
+    }
+
     @PatchMapping("/{id}")
     public ResponseEntity<ReporteGeograficoResponseDTO> actualizarReporteParcial(@PathVariable Integer id, @RequestBody Map<String, Object> campos) {
         return ResponseEntity.ok(service.actualizarParcial(id, campos));

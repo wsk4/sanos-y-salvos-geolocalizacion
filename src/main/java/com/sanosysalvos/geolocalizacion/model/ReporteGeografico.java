@@ -36,4 +36,7 @@ public class ReporteGeografico {
     
     @Column(name = "es_activo")
     private Boolean esActivo = true;
+
+    @Column(name = "direccion")
+    private String direccion;
 }

@@ -9,5 +9,7 @@ import com.sanosysalvos.geolocalizacion.model.ReporteGeografico;
 
 @Repository
 public interface ReporteGeograficoRepository extends JpaRepository<ReporteGeografico, Integer> {
-    Optional<ReporteGeografico> findByMascotaId(Integer mascotaId);
+
+    // NUEVO: obtiene el reporte más reciente de una mascota (por si tiene múltiples reportes)
+    Optional<ReporteGeografico> findFirstByMascotaIdOrderByIdDesc(Integer mascotaId);
 }
