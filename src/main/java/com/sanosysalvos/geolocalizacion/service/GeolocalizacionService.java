@@ -2,7 +2,6 @@ package com.sanosysalvos.geolocalizacion.service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.locationtech.jts.geom.Coordinate;
@@ -20,11 +19,9 @@ import com.sanosysalvos.geolocalizacion.model.ReporteGeografico;
 import com.sanosysalvos.geolocalizacion.repository.ReporteGeograficoRepository;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class GeolocalizacionService {
 
@@ -40,27 +37,29 @@ public class GeolocalizacionService {
 
     @CircuitBreaker(name = "locationIqCB", fallbackMethod = "fallbackRegistrarUbicacion")
     public ReporteGeograficoResponseDTO registrarUbicacion(Integer mascotaId, String direccionStr) {
-        Optional<ReporteGeografico> reporteExistente = repository.findByMascotaId(mascotaId);
-        if (reporteExistente.isPresent()) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Error: La mascota con ID " + mascotaId + " ya cuenta con una ubicación geográfica registrada."
-            );
+        String url = apiUrl + "?key={key}&q={q}&format={format}";
+        LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class, apiKey, direccionStr, "json");
+
+        if (response != null && response.length > 0) {
+            double lat = Double.parseDouble(response[0].getLat());
+            double lon = Double.parseDouble(response[0].getLon());
+
+            Point ubicacionPoint = geometryFactory.createPoint(new Coordinate(lon, lat));
+            ubicacionPoint.setSRID(4326);
+
+            ReporteGeografico reporte = new ReporteGeografico();
+            reporte.setMascotaId(mascotaId);
+            reporte.setUbicacion(ubicacionPoint);
+            reporte.setRadioKm(5.0);
+            reporte.setDireccion(direccionStr);
+
+            return toDTO(repository.save(reporte));
+        } else {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No se pudo encontrar la dirección en LocationIQ");
         }
-
-        Point ubicacionPoint = geocodificarDireccion(direccionStr);
-        ReporteGeografico reporte = new ReporteGeografico();
-        reporte.setMascotaId(mascotaId);
-        reporte.setUbicacion(ubicacionPoint);
-        reporte.setRadioKm(5.0);
-
-        return toDTO(repository.save(reporte));
     }
 
     public ReporteGeograficoResponseDTO fallbackRegistrarUbicacion(Integer mascotaId, String direccionStr, Throwable t) {
-        if (t instanceof ResponseStatusException) {
-            throw (ResponseStatusException) t;
-        }
         throw new ResponseStatusException(
             HttpStatus.SERVICE_UNAVAILABLE,
             "Servicio externo de mapas no disponible temporalmente. (Circuit Breaker Activo)");
@@ -79,6 +78,13 @@ public class GeolocalizacionService {
                         HttpStatus.NOT_FOUND, "El reporte geográfico con ID " + id + " no existe"));
     }
 
+    public ReporteGeograficoResponseDTO obtenerPorMascotaId(Integer mascotaId) {
+        return repository.findFirstByMascotaIdOrderByIdDesc(mascotaId)
+                .map(this::toDTO)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Sin geolocalización para mascota " + mascotaId));
+    }
+
     @CircuitBreaker(name = "locationIqCB", fallbackMethod = "fallbackActualizarParcial")
     public ReporteGeograficoResponseDTO actualizarParcial(Integer id, Map<String, Object> campos) {
         ReporteGeografico reporte = repository.findById(id)
@@ -87,11 +93,8 @@ public class GeolocalizacionService {
 
         if (campos.containsKey("radioKm")) {
             Object radioObj = campos.get("radioKm");
-            if (radioObj instanceof Number) {
-                reporte.setRadioKm(((Number) radioObj).doubleValue());
-            } else {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El valor de radioKm debe ser un número");
-            }
+            Double nuevoRadio = radioObj instanceof Integer ? ((Integer) radioObj).doubleValue() : (Double) radioObj;
+            reporte.setRadioKm(nuevoRadio);
         }
 
         if (campos.containsKey("esActivo")) {
@@ -100,16 +103,27 @@ public class GeolocalizacionService {
 
         if (campos.containsKey("direccion")) {
             String nuevaDireccion = (String) campos.get("direccion");
-            reporte.setUbicacion(geocodificarDireccion(nuevaDireccion));
+            
+            String url = apiUrl + "?key={key}&q={q}&format={format}";
+            LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class, apiKey, nuevaDireccion, "json");
+
+            if (response != null && response.length > 0) {
+                double lat = Double.parseDouble(response[0].getLat());
+                double lon = Double.parseDouble(response[0].getLon());
+
+                Point nuevaUbicacion = geometryFactory.createPoint(new Coordinate(lon, lat));
+                nuevaUbicacion.setSRID(4326);
+                reporte.setUbicacion(nuevaUbicacion);
+                reporte.setDireccion(nuevaDireccion);
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo geolocalizar la nueva dirección");
+            }
         }
 
         return toDTO(repository.save(reporte));
     }
 
     public ReporteGeograficoResponseDTO fallbackActualizarParcial(Integer id, Map<String, Object> campos, Throwable t) {
-        if (t instanceof ResponseStatusException) {
-            throw (ResponseStatusException) t;
-        }
         throw new ResponseStatusException(
             HttpStatus.SERVICE_UNAVAILABLE,
             "No se puede actualizar la dirección porque el servicio externo falló. Intente más tarde.");
@@ -121,24 +135,6 @@ public class GeolocalizacionService {
         repository.delete(reporte);
     }
 
-    private Point geocodificarDireccion(String direccionStr) {
-        String urlTemplate = apiUrl + "?key={key}&q={q}&format=json";
-        LocationIqResponse[] response = restTemplate.getForObject(
-            urlTemplate, LocationIqResponse[].class, apiKey, direccionStr
-        );
-
-        if (response != null && response.length > 0) {
-            double lat = Double.parseDouble(response[0].getLat());
-            double lon = Double.parseDouble(response[0].getLon());
-
-            Point point = geometryFactory.createPoint(new Coordinate(lon, lat));
-            point.setSRID(4326);
-            return point;
-        } else {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No se pudo encontrar la dirección en LocationIQ");
-        }
-    }
-
     private ReporteGeograficoResponseDTO toDTO(ReporteGeografico reporte) {
         return ReporteGeograficoResponseDTO.builder()
                 .id(reporte.getId())
@@ -147,6 +143,7 @@ public class GeolocalizacionService {
                 .longitud(reporte.getUbicacion().getX())
                 .radioKm(reporte.getRadioKm())
                 .esActivo(reporte.getEsActivo())
+                .direccion(reporte.getDireccion())
                 .build();
     }
 }
