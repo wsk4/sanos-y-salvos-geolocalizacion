@@ -1,5 +1,7 @@
 package com.sanosysalvos.geolocalizacion.model;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.locationtech.jts.geom.Point;
 
 import jakarta.persistence.Column;
@@ -26,14 +28,15 @@ public class ReporteGeografico {
 
     @NotNull(message = "El ID de la mascota es obligatorio")
     @Column(name = "mascota_id")
-    private Integer mascotaId; 
+    private Integer mascotaId;
 
-    @Column(columnDefinition = "geometry(Point,4326)") 
+    @Column(columnDefinition = "geometry(Point,4326)")
+    @JdbcTypeCode(SqlTypes.GEOMETRY)
     private Point ubicacion;
 
     @Column(name = "radio_km")
     private Double radioKm;
-    
+
     @Column(name = "es_activo")
     private Boolean esActivo = true;
 
