@@ -37,7 +37,6 @@ public class GeolocalizacionService {
 
     @CircuitBreaker(name = "locationIqCB", fallbackMethod = "fallbackRegistrarUbicacion")
     public ReporteGeograficoResponseDTO registrarUbicacion(Integer mascotaId, String direccionStr) {
-        // CORRECCIÓN: Uso de marcadores de posición {key}, {q}, {format} para forzar URL encoding automático
         String url = apiUrl + "?key={key}&q={q}&format={format}";
         LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class, apiKey, direccionStr, "json");
 
@@ -105,7 +104,6 @@ public class GeolocalizacionService {
         if (campos.containsKey("direccion")) {
             String nuevaDireccion = (String) campos.get("direccion");
             
-            // CORRECCIÓN: Mismo ajuste de URL Encoding para la actualización parcial de direcciones
             String url = apiUrl + "?key={key}&q={q}&format={format}";
             LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class, apiKey, nuevaDireccion, "json");
 
