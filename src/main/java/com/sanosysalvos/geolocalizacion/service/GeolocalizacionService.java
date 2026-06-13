@@ -37,8 +37,9 @@ public class GeolocalizacionService {
 
     @CircuitBreaker(name = "locationIqCB", fallbackMethod = "fallbackRegistrarUbicacion")
     public ReporteGeograficoResponseDTO registrarUbicacion(Integer mascotaId, String direccionStr) {
-        String url = apiUrl + "?key=" + apiKey + "&q=" + direccionStr + "&format=json";
-        LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class);
+        // CORRECCIÓN: Uso de marcadores de posición {key}, {q}, {format} para forzar URL encoding automático
+        String url = apiUrl + "?key={key}&q={q}&format={format}";
+        LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class, apiKey, direccionStr, "json");
 
         if (response != null && response.length > 0) {
             double lat = Double.parseDouble(response[0].getLat());
@@ -51,7 +52,6 @@ public class GeolocalizacionService {
             reporte.setMascotaId(mascotaId);
             reporte.setUbicacion(ubicacionPoint);
             reporte.setRadioKm(5.0);
-            // NUEVO: guarda el texto original de la dirección
             reporte.setDireccion(direccionStr);
 
             return toDTO(repository.save(reporte));
@@ -79,7 +79,6 @@ public class GeolocalizacionService {
                         HttpStatus.NOT_FOUND, "El reporte geográfico con ID " + id + " no existe"));
     }
 
-    // NUEVO: busca el reporte más reciente de una mascota por su ID
     public ReporteGeograficoResponseDTO obtenerPorMascotaId(Integer mascotaId) {
         return repository.findFirstByMascotaIdOrderByIdDesc(mascotaId)
                 .map(this::toDTO)
@@ -105,8 +104,10 @@ public class GeolocalizacionService {
 
         if (campos.containsKey("direccion")) {
             String nuevaDireccion = (String) campos.get("direccion");
-            String url = apiUrl + "?key=" + apiKey + "&q=" + nuevaDireccion + "&format=json";
-            LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class);
+            
+            // CORRECCIÓN: Mismo ajuste de URL Encoding para la actualización parcial de direcciones
+            String url = apiUrl + "?key={key}&q={q}&format={format}";
+            LocationIqResponse[] response = restTemplate.getForObject(url, LocationIqResponse[].class, apiKey, nuevaDireccion, "json");
 
             if (response != null && response.length > 0) {
                 double lat = Double.parseDouble(response[0].getLat());
@@ -115,7 +116,6 @@ public class GeolocalizacionService {
                 Point nuevaUbicacion = geometryFactory.createPoint(new Coordinate(lon, lat));
                 nuevaUbicacion.setSRID(4326);
                 reporte.setUbicacion(nuevaUbicacion);
-                // NUEVO: actualiza también el texto de la dirección
                 reporte.setDireccion(nuevaDireccion);
             } else {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudo geolocalizar la nueva dirección");
@@ -145,7 +145,6 @@ public class GeolocalizacionService {
                 .longitud(reporte.getUbicacion().getX())
                 .radioKm(reporte.getRadioKm())
                 .esActivo(reporte.getEsActivo())
-                // NUEVO: incluye la dirección en texto en la respuesta
                 .direccion(reporte.getDireccion())
                 .build();
     }
