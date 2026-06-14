@@ -11,4 +11,5 @@ import com.sanosysalvos.geolocalizacion.model.ReporteGeografico;
 public interface ReporteGeograficoRepository extends JpaRepository<ReporteGeografico, Integer> {
 
     Optional<ReporteGeografico> findFirstByMascotaIdOrderByIdDesc(Integer mascotaId);
+    Optional<ReporteGeografico> findByMascotaId(Integer mascotaId);
 }
