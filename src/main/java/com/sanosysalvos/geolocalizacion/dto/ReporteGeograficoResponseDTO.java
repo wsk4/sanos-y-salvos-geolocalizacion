@@ -16,4 +16,5 @@ public class ReporteGeograficoResponseDTO {
     private Double longitud;
     private Double radioKm;
     private Boolean esActivo;
+    private String direccion;
 }

@@ -9,11 +9,18 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5433:5432" 
+      - "5433:5432" # El puerto interno sigue siendo 5432 para la red interna
     networks:
       - sanos-network
     volumes:
       - pg_data_geo:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   ms-geolocalizacion:
     build:
       context: .
@@ -22,6 +29,7 @@ services:
     ports:
       - "${SERVER_PORT}:${SERVER_PORT}"
     environment:
+      # Conexión interna usando el puerto nativo de la red de Docker (5432)
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-geolocalizacion:5432/${DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
@@ -29,11 +37,16 @@ services:
       LOCATIONIQ_API_KEY: ${LOCATIONIQ_API_KEY}
       LOCATIONIQ_API_URL: ${LOCATIONIQ_API_URL}
     depends_on:
-      - postgres-geolocalizacion
+      postgres-geolocalizacion:
+        condition: service_healthy # Espera el éxito del healthcheck anterior
     networks:
       - sanos-network
+    restart: on-failure
+
 networks:
   sanos-network:
     external: true
+
 volumes:
   pg_data_geo:
+    driver: local
