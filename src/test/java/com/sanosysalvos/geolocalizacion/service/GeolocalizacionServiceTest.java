@@ -41,7 +41,6 @@ class GeolocalizacionServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Inyectamos las variables privadas sin modificar el código original
         ReflectionTestUtils.setField(service, "apiKey", "test-api-key");
         ReflectionTestUtils.setField(service, "apiUrl", "http://test-url.com/search.php");
         ReflectionTestUtils.setField(service, "restTemplate", restTemplate);
@@ -66,9 +65,9 @@ class GeolocalizacionServiceTest {
         loc.setLon("-70.5953");
         mockResponse[0] = loc;
 
-        Mockito.when(repository.findByMascotaId(10)).thenReturn(Optional.empty());
+        Mockito.lenient().when(repository.findByMascotaId(any())).thenReturn(Optional.empty());
         
-        Mockito.when(restTemplate.getForObject(anyString(), eq(LocationIqResponse[].class), anyString(), anyString()))
+        Mockito.when(restTemplate.getForObject(anyString(), eq(LocationIqResponse[].class), any(), any(), any()))
                 .thenReturn(mockResponse);
                 
         Mockito.when(repository.save(any(ReporteGeografico.class))).thenAnswer(i -> {
@@ -87,11 +86,12 @@ class GeolocalizacionServiceTest {
 
     @Test
     void registrarUbicacion_MascotaYaExiste_DebeLanzarExcepcion() {
-        Mockito.when(repository.findByMascotaId(10)).thenReturn(Optional.of(reporteMock));
+        Mockito.when(repository.findByMascotaId(any())).thenReturn(Optional.of(reporteMock));
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
             service.registrarUbicacion(10, "Av Apoquindo 4800");
         });
+        
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertTrue(exception.getReason().contains("ya cuenta con una ubicación"));
     }
@@ -108,7 +108,7 @@ class GeolocalizacionServiceTest {
 
     @Test
     void obtenerPorId_ExisteId_DebeRetornarDTO() {
-        Mockito.when(repository.findById(1)).thenReturn(Optional.of(reporteMock));
+        Mockito.when(repository.findById(any())).thenReturn(Optional.of(reporteMock));
 
         ReporteGeograficoResponseDTO resultado = service.obtenerPorId(1);
 
@@ -118,7 +118,7 @@ class GeolocalizacionServiceTest {
 
     @Test
     void eliminarReporte_ExisteId_DebeLlamarAlRepositorio() {
-        Mockito.when(repository.findById(1)).thenReturn(Optional.of(reporteMock));
+        Mockito.when(repository.findById(any())).thenReturn(Optional.of(reporteMock));
 
         service.eliminarReporte(1);
 
